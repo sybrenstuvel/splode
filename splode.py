@@ -17,6 +17,19 @@ import bpy
 
 log = logging.getLogger('splode')
 
+
+class SingularPluralDict(dict):
+    def __getitem__(self, key):
+        try:
+            return dict.__getitem__(self, key)
+        except KeyError:
+            return '%ss' % key
+
+singular_to_plural = SingularPluralDict({
+    'mesh': 'meshes',
+})
+
+
 # bpy.data.libraries.write is documented at:
 # https://www.blender.org/api/blender_python_api_2_77_3/bpy.types.BlendDataLibraries.html#bpy.types.BlendDataLibraries.load
 
@@ -69,7 +82,7 @@ def libify(obj: bpy.types.ID, path: pathlib.Path):
     log.info('Libifying %s', obj)
 
     if obj.library:
-        log.info('Already libified, skipping.')
+        log.info('    - already libified, skipping.')
         return None
 
     mkdirs(path)
@@ -78,6 +91,7 @@ def libify(obj: bpy.types.ID, path: pathlib.Path):
 
     bpy.data.libraries.write(fname, {obj}, relative_remap=True)
 
+    linked_in = []
     with bpy.data.libraries.load(fname, link=True, relative=True) as (data_from, data_to):
         # Append everything.
         for attr in dir(data_to):
@@ -88,47 +102,51 @@ def libify(obj: bpy.types.ID, path: pathlib.Path):
 
             log.info('    - importing %i %s', len(to_import), attr)
             setattr(data_to, attr, to_import)
+            linked_in.extend((attr, name) for name in to_import)
 
-    return data_to
+    if len(linked_in) == 1:
+        (attr, name) = linked_in[0]
+        replacement = getattr(data_to, attr)[0]
+    else:
+        log.info('    - imported %i IDs from %s, guessing which one which replaces %s',
+                 len(linked_in), fname, obj.name)
+
+        attr = singular_to_plural[obj.rna_type.name.lower()]
+        data_to_subset = getattr(data_to, attr)
+
+        replacement = next((ob for ob in data_to_subset if ob.name == obj.name), None)
+        if replacement is None:
+            log.warning('    - no imported object is named %s; not replacing.',
+                        obj.name)
+        log.info('    - chose %s.%s from %s', attr, replacement.name, linked_in)
+
+    assert replacement.library is not None
+    replacement.library.name = '%s-%s' % (obj.rna_type.name.lower(), obj.name)
+    obj.user_remap(replacement)
 
 
 def libify_materials(materials, blendpath: pathlib.Path):
     log.info('Libifying materials')
     for mat_idx, mat in enumerate(materials):
-        data_to = libify(mat, blendpath / '_materials')
-        if data_to is None: continue
-        materials[mat_idx].user_remap(data_to.materials[0])
-        data_to.materials[0].library.name = 'material-%s' % mat.name
+        libify(mat, blendpath / '_materials')
 
 
 def libify_material_slots(mslots, blendpath: pathlib.Path):
     log.info('Libifying material slots')
     for slot in mslots:
         if not slot.material: continue
-        data_to = libify(slot.material, blendpath / '_materials')
-        if data_to is None: continue
-        slot.material.user_remap(data_to.materials[0])
-        data_to.materials[0].library.name = 'material-%s' % slot.material.name
+        libify(slot.material, blendpath / '_materials')
 
 
 def libify_mesh(owner, propname: str, blendpath: pathlib.Path):
-    log.info('Libifying mesh')
+    log.info('Libifying mesh %s', str)
     mesh = getattr(owner, propname)
-    data_to = libify(mesh, blendpath / '_meshes')
-    if data_to is None: return
-    mesh.user_remap(data_to.meshes[0])
-    data_to.meshes[0].library.name = 'mesh-%s' % mesh.name
+    libify(mesh, blendpath / '_meshes')
 
 
 def libify_object(scene, ob, blendpath: pathlib.Path):
     log.info('Libifying object %s', ob)
-    data_to = libify(ob, blendpath / '_objects')
-    if data_to is None: return
-
-    libified = data_to.objects[0]
-    ob.user_remap(libified)
-    libified.library.name = 'object-%s' % libified.name
-    return libified
+    libify(ob, blendpath / '_objects')
 
 
 def draw_info_header(self, context):
