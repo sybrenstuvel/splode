@@ -92,32 +92,42 @@ def libify(obj: bpy.types.ID, path: pathlib.Path):
 
 
 def libify_materials(materials, blendpath: pathlib.Path):
+    log.info('Libifying materials')
     for mat_idx, mat in enumerate(materials):
         data_to = libify(mat, blendpath / '_materials')
         if data_to is None: continue
-        materials[mat_idx] =  data_to.materials[0]
+        materials[mat_idx].user_remap(data_to.materials[0])
+        data_to.materials[0].library.name = 'material-%s' % mat.name
 
 
 def libify_material_slots(mslots, blendpath: pathlib.Path):
+    log.info('Libifying material slots')
     for slot in mslots:
         if not slot.material: continue
         data_to = libify(slot.material, blendpath / '_materials')
         if data_to is None: continue
-        slot.material =  data_to.materials[0]
+        slot.material.user_remap(data_to.materials[0])
+        data_to.materials[0].library.name = 'material-%s' % slot.material.name
 
 
 def libify_mesh(owner, propname: str, blendpath: pathlib.Path):
+    log.info('Libifying mesh')
     mesh = getattr(owner, propname)
     data_to = libify(mesh, blendpath / '_meshes')
     if data_to is None: return
-    setattr(owner, propname, data_to.meshes[0])
+    mesh.user_remap(data_to.meshes[0])
+    data_to.meshes[0].library.name = 'mesh-%s' % mesh.name
 
 
 def libify_object(scene, ob, blendpath: pathlib.Path):
+    log.info('Libifying object %s', ob)
     data_to = libify(ob, blendpath / '_objects')
     if data_to is None: return
-    scene.objects.unlink(ob)
-    scene.objects.link(data_to.objects[0])
+
+    libified = data_to.objects[0]
+    ob.user_remap(libified)
+    libified.library.name = 'object-%s' % libified.name
+    return libified
 
 
 def draw_info_header(self, context):
