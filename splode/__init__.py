@@ -15,6 +15,8 @@ import logging
 
 import bpy
 
+from . import first
+
 log = logging.getLogger('splode')
 
 
@@ -114,7 +116,7 @@ def libify(obj: bpy.types.ID, path: pathlib.Path):
         attr = singular_to_plural[obj.rna_type.name.lower()]
         data_to_subset = getattr(data_to, attr)
 
-        replacement = next((ob for ob in data_to_subset if ob.name == obj.name), None)
+        replacement = first.first(data_to_subset, key=lambda ob: ob.name == obj.name)
         if replacement is None:
             log.warning('    - no imported object is named %s; not replacing.',
                         obj.name)
