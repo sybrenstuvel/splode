@@ -35,8 +35,9 @@ class OBJECT_OT_splode(bpy.types.Operator):
             )
 
     @classmethod
-    def pool(cls, context):
-        return bool(context.scene.active_object)
+    def poll(cls, context):
+        return context.object and context.object.type == 'MESH' \
+            and '-libified' not in bpy.context.blend_data.filepath
 
     def execute(self, context):
 
