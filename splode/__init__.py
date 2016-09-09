@@ -63,6 +63,12 @@ class OBJECT_OT_splode(bpy.types.Operator):
         libify_materials(ob.data.materials, root)
         libify_material_slots(ob.material_slots, root)
         libify_mesh(ob, 'data', root)
+
+        for mod in ob.modifiers:
+            if mod.type == 'ARMATURE':
+                log.info('Libifying armature of object %s', ob.name)
+                libify_object(bpy.context.scene, mod.object, root)
+
         libify_object(bpy.context.scene, ob, root)
 
         # Save the current file under a temp name, and reload it, to garbage-collect all unused datablocks.
