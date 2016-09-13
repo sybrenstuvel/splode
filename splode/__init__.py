@@ -15,8 +15,6 @@ import logging
 
 import bpy
 
-from . import first
-
 log = logging.getLogger('splode')
 
 
@@ -87,6 +85,8 @@ def mkdirs(path: pathlib.Path):
 
 
 def libify(obj: bpy.types.ID, path: pathlib.Path):
+    from . import first
+
     log.info('Libifying %s', obj)
 
     if obj.library:
