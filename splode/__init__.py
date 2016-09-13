@@ -25,7 +25,10 @@ ID_TYPES = {'ACTION', 'ARMATURE', 'BRUSH', 'CAMERA', 'CACHEFILE', 'CURVE', 'FONT
             'SCENE', 'SCREEN', 'SOUND', 'SPEAKER', 'TEXT', 'TEXTURE', 'WINDOWMANAGER', 'WORLD'}
 
 # We don't libify all ID types, just the ones in SPLODE_ID_TYPES.
-SPLODE_ID_TYPES = frozenset(ID_TYPES - {'BRUSH', 'CACHEFILE', 'LIBRARY', 'SCREEN', 'WINDOWMANAGER'})
+# The scene shouldn't be libified, otherwise every blendfile that uses scene Scene will link
+# to the same scene object.
+SPLODE_ID_TYPES = frozenset(ID_TYPES - {'BRUSH', 'CACHEFILE', 'LIBRARY', 'SCENE', 'SCREEN',
+                                        'WINDOWMANAGER'})
 
 
 class SingularPluralDict(dict):
