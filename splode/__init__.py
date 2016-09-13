@@ -164,30 +164,6 @@ def bottom_up(id_types: set = SPLODE_ID_TYPES):
         yield from visit(to_visit.pop())
 
 
-def libify_materials(materials, blendpath: pathlib.Path):
-    log.info('Libifying materials')
-    for mat_idx, mat in enumerate(materials):
-        libify(mat, blendpath / '_materials')
-
-
-def libify_material_slots(mslots, blendpath: pathlib.Path):
-    log.info('Libifying material slots')
-    for slot in mslots:
-        if not slot.material: continue
-        libify(slot.material, blendpath / '_materials')
-
-
-def libify_mesh(owner, propname: str, blendpath: pathlib.Path):
-    log.info('Libifying mesh %s', str)
-    mesh = getattr(owner, propname)
-    libify(mesh, blendpath / '_meshes')
-
-
-def libify_object(scene, ob, blendpath: pathlib.Path):
-    log.info('Libifying object %s', ob)
-    libify(ob, blendpath / '_objects')
-
-
 def draw_info_header(self, context):
     layout = self.layout
     layout.operator(OBJECT_OT_splode.bl_idname, text='Splode')
