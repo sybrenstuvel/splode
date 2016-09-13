@@ -148,7 +148,7 @@ def bottom_up(id_types: set = SPLODE_ID_TYPES):
             if idblock.use_fake_user:
                 yield idblock
 
-    to_visit = set(reversed_map.keys())
+    to_visit = set(user_map.keys())
 
     def visit(idblock):
         to_visit.discard(idblock)
@@ -161,6 +161,7 @@ def bottom_up(id_types: set = SPLODE_ID_TYPES):
         yield idblock
 
     while to_visit:
+        # At the top level it doesn't matter which object we visit first.
         yield from visit(to_visit.pop())
 
 
