@@ -17,6 +17,16 @@ import bpy
 
 log = logging.getLogger('splode')
 
+# A set of all ID types.
+# Taken from https://www.blender.org/api/blender_python_api_master/bpy.types.KeyingSetPath.html#bpy.types.KeyingSetPath.id_type
+ID_TYPES = {'ACTION', 'ARMATURE', 'BRUSH', 'CAMERA', 'CACHEFILE', 'CURVE', 'FONT', 'GREASEPENCIL',
+            'GROUP', 'IMAGE', 'KEY', 'LAMP', 'LIBRARY', 'LINESTYLE', 'LATTICE', 'MASK', 'MATERIAL',
+            'META', 'MESH', 'MOVIECLIP', 'NODETREE', 'OBJECT', 'PAINTCURVE', 'PALETTE', 'PARTICLE',
+            'SCENE', 'SCREEN', 'SOUND', 'SPEAKER', 'TEXT', 'TEXTURE', 'WINDOWMANAGER', 'WORLD'}
+
+# We don't libify all ID types, just the ones in SPLODE_ID_TYPES.
+SPLODE_ID_TYPES = frozenset(ID_TYPES - {'BRUSH', 'CACHEFILE', 'LIBRARY', 'SCREEN', 'WINDOWMANAGER'})
+
 
 class SingularPluralDict(dict):
     def __getitem__(self, key):
@@ -49,33 +59,15 @@ class OBJECT_OT_splode(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        return context.object and context.object.type == 'MESH' \
-            and '-libified' not in bpy.context.blend_data.filepath
+        return '-libified' not in bpy.context.blend_data.filepath
 
     def execute(self, context):
-
-        ob = context.object
         root = pathlib.Path(self.root)
 
-        # Libify everything.
-        libify_materials(ob.data.materials, root)
-        libify_material_slots(ob.material_slots, root)
-        libify_mesh(ob, 'data', root)
-
-        for mod in ob.modifiers:
-            if mod.type == 'ARMATURE':
-                log.info('Libifying armature of object %s', ob.name)
-                libify_object(bpy.context.scene, mod.object, root)
-
-        libify_object(bpy.context.scene, ob, root)
-
-        # Save the current file under a temp name, and reload it, to garbage-collect all unused datablocks.
-        tmpname = bpy.context.blend_data.filepath.replace('.blend', '-libified.blend')
-        bpy.ops.wm.save_as_mainfile(filepath=tmpname)
-        bpy.ops.wm.open_mainfile(filepath=tmpname)
-
-        # Make everything we libified local again.
-        # bpy.ops.object.make_local(type='ALL')
+        for idblock in bottom_up():
+            dirname = '_' + singular_to_plural[idblock.rna_type.name.lower()]
+            path = root / dirname
+            libify(idblock, path)
 
         return {'FINISHED'}
 
@@ -131,6 +123,44 @@ def libify(obj: bpy.types.ID, path: pathlib.Path):
     assert replacement.library is not None
     replacement.library.name = '%s-%s' % (obj.rna_type.name.lower(), obj.name)
     obj.user_remap(replacement)
+
+
+def bottom_up(id_types: set = SPLODE_ID_TYPES):
+    """Generator, yields datablocks from the bottom (i.e. uses nothing) upward.
+
+    Stupid in that it doesn't detect cycles yet.
+    """
+
+    import collections
+
+    id_types = set(id_types)  # convert from frozenset to set
+    user_map = bpy.data.user_map(key_types=id_types, value_types=id_types)
+
+    # Reverse the user_map() mapping, so we have idblock -> {set of idblocks it uses}
+    reversed_map = collections.defaultdict(set)
+    for idblock, users in user_map.items():
+        if users:
+            for user in users:
+                reversed_map[user].add(idblock)
+        else:
+            # We can yield unused blocks immediately, and be done with them.
+            if idblock.use_fake_user:
+                yield idblock
+
+    to_visit = set(reversed_map.keys())
+
+    def visit(idblock):
+        to_visit.discard(idblock)
+
+        dependencies = reversed_map[idblock]
+        for dep in dependencies:
+            if dep in to_visit:
+                yield from visit(dep)
+
+        yield idblock
+
+    while to_visit:
+        yield from visit(to_visit.pop())
 
 
 def libify_materials(materials, blendpath: pathlib.Path):
