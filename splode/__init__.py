@@ -7,7 +7,7 @@ bl_info = {
     "description": "Explodes the current blendfile",
     "warning": "Explodes",
     "category": "System",
-    }
+}
 
 import pathlib
 import os
@@ -35,6 +35,7 @@ class SingularPluralDict(dict):
         except KeyError:
             return '%ss' % key
 
+
 singular_to_plural = SingularPluralDict({
     'mesh': 'meshes',
 })
@@ -51,11 +52,11 @@ class OBJECT_OT_splode(bpy.types.Operator):
     bl_options = {'REGISTER', 'UNDO'}
 
     root = bpy.props.StringProperty(
-            name='root',
-            default='//',
-            subtype='FILE_PATH',
-            description="Root path to explode stuff to",
-            )
+        name='root',
+        default='//',
+        subtype='FILE_PATH',
+        description="Root path to explode stuff to",
+    )
 
     @classmethod
     def poll(cls, context):
@@ -190,7 +191,7 @@ def libify_object(scene, ob, blendpath: pathlib.Path):
 def draw_info_header(self, context):
     layout = self.layout
     layout.operator(OBJECT_OT_splode.bl_idname, text='Splode')
-    layout.operator('object.make_local', text='Make all local').type='ALL'
+    layout.operator('object.make_local', text='Make all local').type = 'ALL'
 
 
 def register():
