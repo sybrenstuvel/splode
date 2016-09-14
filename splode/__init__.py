@@ -80,21 +80,21 @@ def mkdirs(path: pathlib.Path):
     os.makedirs(bpy.path.abspath(str(path)), exist_ok=True)
 
 
-def libify(obj: bpy.types.ID, root_path: pathlib.Path):
+def libify(idblock: bpy.types.ID, root_path: pathlib.Path):
     from . import first
 
-    log.info('Libifying %s', obj)
+    log.info('Libifying %s', idblock)
 
-    fname = blendfile_for_idblock(obj, root_path)
+    fname = blendfile_for_idblock(idblock, root_path)
 
-    if obj.library:
-        log.info('    - already libified in %s, skipping.', obj.library.filepath)
+    if idblock.library:
+        log.info('    - already libified in %s, skipping.', idblock.library.filepath)
         return None
 
     mkdirs(fname.parent)
     log.info('    - saving to %s' % fname)
 
-    bpy.data.libraries.write(str(fname), {obj}, relative_remap=True)
+    bpy.data.libraries.write(str(fname), {idblock}, relative_remap=True)
 
     linked_in = []
     with bpy.data.libraries.load(str(fname), link=True, relative=True) as (data_from, data_to):
@@ -114,20 +114,20 @@ def libify(obj: bpy.types.ID, root_path: pathlib.Path):
         replacement = getattr(data_to, attr)[0]
     else:
         log.info('    - imported %i IDs from %s, guessing which one which replaces %s',
-                 len(linked_in), fname, obj.name)
+                 len(linked_in), fname, idblock.name)
 
-        attr = singular_to_plural[obj.rna_type.name.lower()]
+        attr = singular_to_plural[idblock.rna_type.name.lower()]
         data_to_subset = getattr(data_to, attr)
 
-        replacement = first.first(data_to_subset, key=lambda ob: ob.name == obj.name)
+        replacement = first.first(data_to_subset, key=lambda ob: ob.name == idblock.name)
         if replacement is None:
             log.warning('    - no imported object is named %s; not replacing.',
-                        obj.name)
+                        idblock.name)
         log.info('    - chose %s.%s from %s', attr, replacement.name, linked_in)
 
     assert replacement.library is not None
-    replacement.library.name = '%s-%s' % (obj.rna_type.name.lower(), obj.name)
-    obj.user_remap(replacement)
+    replacement.library.name = '%s-%s' % (idblock.rna_type.name.lower(), idblock.name)
+    idblock.user_remap(replacement)
 
 
 def blendfile_for_idblock(idblock: bpy.types.ID, root_path: pathlib.Path) -> pathlib.Path:
