@@ -26,10 +26,6 @@ class OBJECT_OT_splode(bpy.types.Operator):
         description="Root path to explode stuff to",
     )
 
-    @classmethod
-    def poll(cls, context):
-        return '-libified' not in bpy.context.blend_data.filepath
-
     def execute(self, context):
         import pathlib
         from . import internal
