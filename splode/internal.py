@@ -144,7 +144,7 @@ def libify(idblock: bpy.types.ID, root_path: pathlib.Path, *, write_idblock=True
 def blendfile_for_idblock(idblock: bpy.types.ID, root_path: pathlib.Path) -> pathlib.Path:
     """Returns the filename for the single-thingy blendfile containing this idblock."""
 
-    dirname = '_' + singular_to_plural[idblock.rna_type.name.lower()]
+    dirname = '_' + singular_to_plural[idblock.rna_type.identifier]
     path = root_path / dirname
     return path / ('%s.blend' % idblock.name)
 
