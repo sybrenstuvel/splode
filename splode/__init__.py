@@ -12,12 +12,12 @@ bl_info = {
 import bpy
 
 
-class OBJECT_OT_splode(bpy.types.Operator):
+class FILE_OT_splode(bpy.types.Operator):
     """Explode the object"""
 
-    bl_idname = "object.splode"
-    bl_label = "Splode the current object"
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_idname = 'file.splode'
+    bl_label = 'Splode the current blendfile'
+    bl_options = {'REGISTER'}
 
     root = bpy.props.StringProperty(
         name='root',
@@ -37,17 +37,17 @@ class OBJECT_OT_splode(bpy.types.Operator):
 
 def draw_info_header(self, context):
     layout = self.layout
-    layout.operator(OBJECT_OT_splode.bl_idname, text='Splode')
+    layout.operator(FILE_OT_splode.bl_idname, text='Splode')
     layout.operator('object.make_local', text='Make all local').type = 'ALL'
 
 
 def register():
-    bpy.utils.register_class(OBJECT_OT_splode)
+    bpy.utils.register_class(FILE_OT_splode)
     bpy.types.INFO_HT_header.append(draw_info_header)
 
 
 def unregister():
-    bpy.utils.unregister_class(OBJECT_OT_splode)
+    bpy.utils.unregister_class(FILE_OT_splode)
     bpy.types.INFO_HT_header.remove(draw_info_header)
 
 
