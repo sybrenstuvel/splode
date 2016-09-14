@@ -6,27 +6,22 @@ log = logging.getLogger(__name__)
 
 
 def find_cycles(user_map: dict) -> list:
-    """Returns dependency cycles."""
+    """Generator, yields dependency cycles."""
 
     log.info('Finding dependency cycles.')
-
-    cycles = []
 
     def chain(startid, chain_so_far=()):
         log.debug('    - inspecting (%r, %r)', startid, chain_so_far)
         if startid in chain_so_far:
             log.info('    - found cycle %r', chain_so_far)
-            cycles.append(chain_so_far)
+            yield chain_so_far
             return
 
         for nextid in user_map[startid]:
-            chain(nextid, chain_so_far + (startid,))
+            yield from chain(nextid, chain_so_far + (startid,))
 
     for idblock in user_map.keys():
-        chain(idblock)
-
-    log.info('Found %i cycles.', len(cycles))
-    return cycles
+        yield from chain(idblock)
 
 
 def unify_cycles(cycles: list) -> set:

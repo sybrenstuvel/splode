@@ -65,10 +65,11 @@ def splode(root_path: pathlib.Path):
 
     user_map = selective_user_map()
 
-    cycle_list = depcycles.find_cycles(user_map)
+    cycle_gen = depcycles.find_cycles(user_map)
+    cycles = depcycles.unify_cycles(cycle_gen)
+
     to_embed = set()
-    if cycle_list:
-        cycles = depcycles.unify_cycles(cycle_list)
+    if cycles:
         depcycles.assert_disjoint(cycles)
         log.info('Found %i disjoint cycles: %s', len(cycles), cycles)
 
