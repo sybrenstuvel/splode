@@ -80,23 +80,24 @@ def mkdirs(path: pathlib.Path):
     os.makedirs(bpy.path.abspath(str(path)), exist_ok=True)
 
 
-def libify(obj: bpy.types.ID, path: pathlib.Path):
+def libify(obj: bpy.types.ID, root_path: pathlib.Path):
     from . import first
 
     log.info('Libifying %s', obj)
 
+    fname = blendfile_for_idblock(obj, root_path)
+
     if obj.library:
-        log.info('    - already libified, skipping.')
+        log.info('    - already libified in %s, skipping.', obj.library.filepath)
         return None
 
-    mkdirs(path)
-    fname = str(path / ('%s.blend' % obj.name))
+    mkdirs(fname.parent)
     log.info('    - saving to %s' % fname)
 
-    bpy.data.libraries.write(fname, {obj}, relative_remap=True)
+    bpy.data.libraries.write(str(fname), {obj}, relative_remap=True)
 
     linked_in = []
-    with bpy.data.libraries.load(fname, link=True, relative=True) as (data_from, data_to):
+    with bpy.data.libraries.load(str(fname), link=True, relative=True) as (data_from, data_to):
         # Append everything.
         for attr in dir(data_to):
             to_import = getattr(data_from, attr)
@@ -127,6 +128,14 @@ def libify(obj: bpy.types.ID, path: pathlib.Path):
     assert replacement.library is not None
     replacement.library.name = '%s-%s' % (obj.rna_type.name.lower(), obj.name)
     obj.user_remap(replacement)
+
+
+def blendfile_for_idblock(idblock: bpy.types.ID, root_path: pathlib.Path) -> pathlib.Path:
+    """Returns the filename for the single-thingy blendfile containing this idblock."""
+
+    dirname = '_' + singular_to_plural[idblock.rna_type.name.lower()]
+    path = root_path / dirname
+    return path / ('%s.blend' % idblock.name)
 
 
 def bottom_up(user_map: dict):
