@@ -68,10 +68,10 @@ class OBJECT_OT_splode(bpy.types.Operator):
     def execute(self, context):
         root = pathlib.Path(self.root)
 
-        for idblock in bottom_up():
-            dirname = '_' + singular_to_plural[idblock.rna_type.name.lower()]
-            path = root / dirname
-            libify(idblock, path)
+        user_map = selective_user_map()
+
+        for idblock in bottom_up(user_map):
+            libify(idblock, root)
 
         return {'FINISHED'}
 
@@ -129,16 +129,15 @@ def libify(obj: bpy.types.ID, path: pathlib.Path):
     obj.user_remap(replacement)
 
 
-def bottom_up(id_types: set = SPLODE_ID_TYPES):
+def bottom_up(user_map: dict):
     """Generator, yields datablocks from the bottom (i.e. uses nothing) upward.
 
     Stupid in that it doesn't detect cycles yet.
+
+    :param user_map: result from `selective_user_map()`.
     """
 
     import collections
-
-    id_types = set(id_types)  # convert from frozenset to set
-    user_map = bpy.data.user_map(key_types=id_types, value_types=id_types)
 
     # Reverse the user_map() mapping, so we have idblock -> {set of idblocks it uses}
     reversed_map = collections.defaultdict(set)
@@ -166,6 +165,18 @@ def bottom_up(id_types: set = SPLODE_ID_TYPES):
     while to_visit:
         # At the top level it doesn't matter which object we visit first.
         yield from visit(to_visit.pop())
+
+
+def selective_user_map(id_types: set = SPLODE_ID_TYPES) -> dict:
+    """Returns bpy.data.user_map(key_types=id_types, value_types=id_types)"""
+
+    id_types = set(id_types)  # convert from frozenset to set
+    user_map = bpy.data.user_map(key_types=id_types, value_types=id_types)
+
+    import pprint
+    log.info('User map:\n%s', pprint.pformat(user_map))
+
+    return user_map
 
 
 def draw_info_header(self, context):
