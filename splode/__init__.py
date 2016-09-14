@@ -45,7 +45,7 @@ singular_to_plural = SingularPluralDict({
 
 
 # bpy.data.libraries.write is documented at:
-# https://www.blender.org/api/blender_python_api_2_77_3/bpy.types.BlendDataLibraries.html#bpy.types.BlendDataLibraries.load
+# https://www.blender.org/api/blender_python_api_2_77_3/bpy.types.BlendDataLibraries.html#bpy.types.BlendDataLibraries.write
 
 class OBJECT_OT_splode(bpy.types.Operator):
     """Explode the object"""
