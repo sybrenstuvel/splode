@@ -120,7 +120,6 @@ def libify(idblock: bpy.types.ID, root_path: pathlib.Path, *, write_idblock=True
             linked_in.extend((attr, name) for name in to_import)
 
     # Replace every idblock with the linked-in version.
-    # have_set_libname = False
     for attr in dir(data_to):
         linked_in = getattr(data_to, attr)
         try:
@@ -131,10 +130,9 @@ def libify(idblock: bpy.types.ID, root_path: pathlib.Path, *, write_idblock=True
             continue
 
         for replacement in linked_in:
-            # if not have_set_libname:
-            #     assert replacement.library is not None
-            #     replacement.library.name = '%s-%s' % (idblock.rna_type.name.lower(), idblock.name)
-            #     have_set_libname = True
+            assert replacement.library is not None
+            replacement.library.name = '%s-%s' % (replacement.rna_type.identifier, idblock.name)
+
             local_idblock = local_idblocks[replacement.name]
             log.info('    - replacing %r with linked-in %r from %r',
                      local_idblock, replacement, replacement.library.filepath)
