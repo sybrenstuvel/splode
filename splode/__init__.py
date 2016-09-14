@@ -80,7 +80,7 @@ def mkdirs(path: pathlib.Path):
     os.makedirs(bpy.path.abspath(str(path)), exist_ok=True)
 
 
-def libify(idblock: bpy.types.ID, root_path: pathlib.Path):
+def libify(idblock: bpy.types.ID, root_path: pathlib.Path, *, write_idblock=True):
     from . import first
 
     log.info('Libifying %s', idblock)
@@ -92,10 +92,12 @@ def libify(idblock: bpy.types.ID, root_path: pathlib.Path):
         return None
 
     mkdirs(fname.parent)
-    log.info('    - saving to %s' % fname)
 
-    bpy.data.libraries.write(str(fname), {idblock}, relative_remap=True)
+    if write_idblock:
+        log.info('    - saving to %s', fname)
+        bpy.data.libraries.write(str(fname), {idblock}, relative_remap=True)
 
+    log.info('    - linking from %s', fname)
     linked_in = []
     with bpy.data.libraries.load(str(fname), link=True, relative=True) as (data_from, data_to):
         # Append everything.
