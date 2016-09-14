@@ -13,6 +13,7 @@ import pathlib
 import os
 import logging
 from enum import Enum
+import collections
 
 import bpy
 
@@ -30,6 +31,18 @@ ID_TYPES = {'ACTION', 'ARMATURE', 'BRUSH', 'CAMERA', 'CACHEFILE', 'CURVE', 'FONT
 # to the same scene object.
 SPLODE_ID_TYPES = frozenset(ID_TYPES - {'BRUSH', 'CACHEFILE', 'LIBRARY', 'SCENE', 'SCREEN',
                                         'WINDOWMANAGER'})
+
+# Ordering of ID types for cyclic dependency handling. When a set of ID blocks have cyclic
+# dependencies, the entire dependency chain will be saved to a single blendfile. The
+# ID block with the lowest value in the SPLODE_ID_TYPE_ORDER dict will determine the filename
+# of that blendfile. Objects are noted in 'OBJECT_{object.type}' notatation; if these don't
+# exist for the particular object type, 'OBJECT' is used.
+SPLODE_ID_TYPE_ORDER = collections.defaultdict(
+    int,  # so the default value for unlisted types is 0.
+    OBJECT_ARMATURE=-20,
+    OBJECT=-10,
+    OBJECT_EMPTY=-5,
+)
 
 
 class BlenderExitCodes(Enum):
@@ -73,109 +86,42 @@ class OBJECT_OT_splode(bpy.types.Operator):
         return '-libified' not in bpy.context.blend_data.filepath
 
     def execute(self, context):
-        root = pathlib.Path(self.root)
+        from . import depcycles
 
         user_map = selective_user_map()
 
+        cycle_list = depcycles.find_cycles(user_map)
+        to_embed = set()
+        if cycle_list:
+            cycles = depcycles.unify_cycles(cycle_list)
+            depcycles.assert_disjoint(cycles)
+            log.info('Found %i disjoint cycles: %s', len(cycles), cycles)
+
+            # For each cycle, determine which object is going to be saved.
+            # Blender will automatically save the rest of the cycle in that file.
+            to_save, to_embed = depcycles.find_main_idblocks(cycles, SPLODE_ID_TYPE_ORDER)
+            log.info('    - going to save: %r', to_save)
+            log.info('    - going to embed: %r', to_embed)
+
+        root = pathlib.Path(self.root)
+
         for idblock in bottom_up(user_map):
-            libify(idblock, root)
-
-        # Handle cycles; this uses a name-based approach, so we can use the
-        # same user_map (which still refers to pre-sploding objects).
-
-        # FIXME: This creates cyclic links between Blender libraries, which isn't supported yet.
-        # mont29 sees possibilities to make it work using placeholder datablocks, and then making
-        # everything local when loading, but this requires too much Blender code change to
-        # invest time in at the moment.
-        cycles = find_cycles(user_map)
-        if cycles:
-            idblocks = {idblock for cycle in cycles for idblock in cycle}
-            log.warning('Going to re-link the following: %s', idblocks)
-            for idblock in idblocks:
-                fname = blendfile_for_idblock(idblock, root)
-                absfname = bpy.path.abspath(str(fname))
-                rna_type_name = idblock.rna_type.name
-
-                run_blender([
-                    '--background', absfname,
-                    '--python-expr',
-                    'import splode; splode.relink_all_except(%r, %r)' %
-                        (rna_type_name, idblock.name)
-                ])
+            if idblock in to_embed:
+                log.info("Skipping libification of %r, it'll be part of another file.", idblock)
+            else:
+                libify(idblock, root)
 
         return {'FINISHED'}
-
-
-def run_blender(cli_args: list):
-    import subprocess
-
-    args = [bpy.app.binary_path] + cli_args
-    log.info('Running %s', args)
-    blender = subprocess.Popen(args)
-    try:
-        blender.communicate(timeout=300)  # Should be easily done in 5 minutes
-    except subprocess.TimeoutExpired:
-        blender.kill()
-        blender.communicate()  # flush & close buffers
-        raise
-
-    returncode = BlenderExitCodes(blender.returncode)
-    if returncode is not BlenderExitCodes.OK:
-        log.error('Blender returned an error code: %r', returncode)
-        raise RuntimeError('Blender returned an error code: %r' % returncode)
 
 
 def mkdirs(path: pathlib.Path):
     os.makedirs(bpy.path.abspath(str(path)), exist_ok=True)
 
 
-def relink_all_except(rna_type_name: str, idblock_name: str):
-    """Re-link all objects except the named idblock.
-
-    Assumes the current file should be a single-thingy file, and saves to root_path='//../x/y.blend'
-
-    WARNING: THIS FUNCTION QUITS BLENDER BY CALLING SYS.EXIT(n). It is meant to be
-    called in a Blender subprocess.
-    """
-
-    import sys
-
-    single_thingy_fmtname = '<%s %s>' % (rna_type_name, idblock_name)
-    root = pathlib.Path('//..')
-    log.info('Relinking all except %s, root=%s', single_thingy_fmtname, root)
-
-    # Libify everything except for one idblock.
-    this_single_thingy = None
-    user_map = selective_user_map()
-    for idblock in bottom_up(user_map):
-        if idblock.name == idblock_name and rna_type_name == idblock.rna_type.name:
-            log.info('Skipping %r', idblock)
-            this_single_thingy = idblock
-            continue
-        libify(idblock, root, write_idblock=False)
-
-    log.info('Done relinking all except %s', single_thingy_fmtname)
-
-    # Complain if we couldn't find the single thingy
-    if this_single_thingy is None:
-        log.error('Did not find %s in %s, but it should be!',
-                  single_thingy_fmtname, bpy.data.filepath)
-        sys.exit(BlenderExitCodes.ERROR_SINGLE_THINGY_NOT_FOUND)
-
-    # Write the single thingy again to the current blend file
-    # FIXME: (well, to another one for dev purposes).
-    outpath = bpy.data.filepath.replace('.blend', '-relinked.blend')
-    log.info('Saving %s to %s', single_thingy_fmtname, outpath)
-    bpy.data.libraries.write(outpath, {this_single_thingy}, relative_remap=True)
-
-    log.info('Exiting Blender')
-    sys.exit(0)
-
-
 def libify(idblock: bpy.types.ID, root_path: pathlib.Path, *, write_idblock=True):
     from . import first
 
-    log.info('Libifying %s', idblock)
+    log.info('Libifying %r', idblock)
 
     fname = blendfile_for_idblock(idblock, root_path)
 
@@ -192,7 +138,7 @@ def libify(idblock: bpy.types.ID, root_path: pathlib.Path, *, write_idblock=True
     log.info('    - linking from %s', fname)
     linked_in = []
     with bpy.data.libraries.load(str(fname), link=True, relative=True) as (data_from, data_to):
-        # Append everything.
+        # Link everything.
         for attr in dir(data_to):
             to_import = getattr(data_from, attr)
             if not to_import:
@@ -203,25 +149,26 @@ def libify(idblock: bpy.types.ID, root_path: pathlib.Path, *, write_idblock=True
             setattr(data_to, attr, to_import)
             linked_in.extend((attr, name) for name in to_import)
 
-    if len(linked_in) == 1:
-        (attr, name) = linked_in[0]
-        replacement = getattr(data_to, attr)[0]
-    else:
-        log.info('    - imported %i IDs from %s, guessing which one which replaces %s',
-                 len(linked_in), fname, idblock.name)
+    # Replace every idblock with the linked-in version.
+    # have_set_libname = False
+    for attr in dir(data_to):
+        linked_in = getattr(data_to, attr)
+        try:
+            local_idblocks = getattr(bpy.data, attr)
+        except AttributeError:
+            if linked_in:
+                log.warning('Skipping replacement of linked in objects for: %s', linked_in)
+            continue
 
-        attr = singular_to_plural[idblock.rna_type.name.lower()]
-        data_to_subset = getattr(data_to, attr)
-
-        replacement = first.first(data_to_subset, key=lambda ob: ob.name == idblock.name)
-        if replacement is None:
-            log.warning('    - no imported object is named %s; not replacing.',
-                        idblock.name)
-        log.info('    - chose %s.%s from %s', attr, replacement.name, linked_in)
-
-    assert replacement.library is not None
-    replacement.library.name = '%s-%s' % (idblock.rna_type.name.lower(), idblock.name)
-    idblock.user_remap(replacement)
+        for replacement in linked_in:
+            # if not have_set_libname:
+            #     assert replacement.library is not None
+            #     replacement.library.name = '%s-%s' % (idblock.rna_type.name.lower(), idblock.name)
+            #     have_set_libname = True
+            local_idblock = local_idblocks[replacement.name]
+            log.info('    - replacing %r with linked-in %r from %r',
+                     local_idblock, replacement, replacement.library.filepath)
+            local_idblock.user_remap(replacement)
 
 
 def blendfile_for_idblock(idblock: bpy.types.ID, root_path: pathlib.Path) -> pathlib.Path:
@@ -280,30 +227,6 @@ def selective_user_map(id_types: set = SPLODE_ID_TYPES) -> dict:
     log.info('User map:\n%s', pprint.pformat(user_map))
 
     return user_map
-
-
-def find_cycles(user_map: dict) -> list:
-    """Returns dependency cycles."""
-
-    log.info('Finding dependency cycles.')
-
-    cycles = []
-
-    def chain(startid, chain_so_far=()):
-        log.debug('    - inspecting (%r, %r)', startid, chain_so_far)
-        if startid in chain_so_far:
-            log.info('    - found cycle %r', chain_so_far)
-            cycles.append(chain_so_far)
-            return
-
-        for nextid in user_map[startid]:
-            chain(nextid, chain_so_far + (startid,))
-
-    for idblock in user_map.keys():
-        chain(idblock)
-
-    log.info('Found %i cycles.', len(cycles))
-    return cycles
 
 
 def draw_info_header(self, context):
