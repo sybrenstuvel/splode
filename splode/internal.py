@@ -131,7 +131,7 @@ def libify(idblock: bpy.types.ID, root_path: pathlib.Path, *, write_idblock=True
 
         for replacement in linked_in:
             assert replacement.library is not None
-            replacement.library.name = '%s-%s' % (replacement.rna_type.identifier, idblock.name)
+            replacement.library.name = '%s-%s' % (replacement.rna_type.identifier, replacement.name)
 
             local_idblock = local_idblocks[replacement.name]
             log.info('    - replacing %r with linked-in %r from %r',
