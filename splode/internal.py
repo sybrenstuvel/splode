@@ -189,7 +189,21 @@ def selective_user_map(id_types: set = SPLODE_ID_TYPES) -> dict:
     id_types = set(id_types)  # convert from frozenset to set
     user_map = bpy.data.user_map(key_types=id_types, value_types=id_types)
 
-    import pprint
-    log.info('User map:\n%s', pprint.pformat(user_map))
+    if log.isEnabledFor(logging.INFO):
+        class NoQuoteRepr(str):
+            def __repr__(self):
+                return self
+
+        def prettify(ob):
+            if isinstance(ob, set):
+                return {prettify(x) for x in ob}
+            if ob.library:
+                return NoQuoteRepr('%r@%s' % (ob, ob.library.filepath))
+            return NoQuoteRepr('%rL' % ob)
+
+        print_map = {prettify(key): prettify(values) for key, values in user_map.items()}
+
+        import pprint
+        log.info('User map:\n%s', pprint.pformat(print_map))
 
     return user_map
