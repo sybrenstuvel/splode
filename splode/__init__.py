@@ -42,6 +42,32 @@ class FILE_OT_splode(bpy.types.Operator):
         return {'FINISHED'}
 
 
+class OBJECT_OT_libify(bpy.types.Operator):
+    bl_idname = 'object.libify'
+    bl_label = 'Libify the object'
+    bl_description = 'Libifies the object and its dependencies to a single file'
+    bl_options = {'REGISTER'}
+
+    root = bpy.props.StringProperty(
+        name='root',
+        default='//',
+        subtype='FILE_PATH',
+        description="Root path to explode stuff to",
+    )
+
+    @classmethod
+    def poll(cls, context):
+        return context.object
+
+    def execute(self, context):
+        import pathlib
+        from . import internal
+
+        internal.libify(context.object, pathlib.Path(self.root))
+
+        return {'FINISHED'}
+
+
 class SPLODE_OT_find_cycles(bpy.types.Operator):
     bl_idname = 'splode.find_cycles'
     bl_label = 'Find cycles'
@@ -72,18 +98,21 @@ class SPLODE_OT_find_cycles(bpy.types.Operator):
 def draw_info_header(self, context):
     layout = self.layout
     layout.operator(FILE_OT_splode.bl_idname, text='Splode')
+    layout.operator(OBJECT_OT_libify.bl_idname, text='Libify object')
     layout.operator(SPLODE_OT_find_cycles.bl_idname)
     layout.operator('object.make_local', text='Make all local').type = 'ALL'
 
 
 def register():
     bpy.utils.register_class(FILE_OT_splode)
+    bpy.utils.register_class(OBJECT_OT_libify)
     bpy.utils.register_class(SPLODE_OT_find_cycles)
     bpy.types.VIEW3D_HT_header.append(draw_info_header)
 
 
 def unregister():
     bpy.utils.unregister_class(FILE_OT_splode)
+    bpy.utils.unregister_class(OBJECT_OT_libify)
     bpy.utils.unregister_class(SPLODE_OT_find_cycles)
     bpy.types.VIEW3D_HT_header.remove(draw_info_header)
 
