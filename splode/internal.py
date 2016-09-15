@@ -190,18 +190,26 @@ def selective_user_map(id_types: set = SPLODE_ID_TYPES) -> dict:
     user_map = bpy.data.user_map(key_types=id_types, value_types=id_types)
 
     if log.isEnabledFor(logging.INFO):
+        longest_key = 0
+
         class NoQuoteRepr(str):
             def __repr__(self):
-                return self
+                return str(self)
 
-        def prettify(ob):
+        class NoQuoteReprLJust(str):
+            def __repr__(self):
+                return str(self).ljust(longest_key)
+
+        def prettify(ob, cls):
             if isinstance(ob, set):
-                return {prettify(x) for x in ob}
+                return {prettify(x, cls) for x in ob}
             if ob.library:
-                return NoQuoteRepr('%r@%s' % (ob, ob.library.filepath))
-            return NoQuoteRepr('%rL' % ob)
+                return cls('%r@%s' % (ob, ob.library.filepath))
+            return cls('%rL' % ob)
 
-        print_map = {prettify(key): prettify(values) for key, values in user_map.items()}
+        print_map = {prettify(key, NoQuoteReprLJust): prettify(values, NoQuoteRepr)
+                     for key, values in user_map.items()}
+        longest_key = len(max((repr(key) for key in print_map.keys()), key=len))
 
         import pprint
         log.info('User map:\n%s', pprint.pformat(print_map))
