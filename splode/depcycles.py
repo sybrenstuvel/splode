@@ -11,13 +11,16 @@ def find_cycles(user_map: dict) -> list:
     log.info('Finding dependency cycles.')
 
     def chain(startid, chain_so_far=()):
-        log.debug('    - inspecting (%r, %r)', startid, chain_so_far)
+        # log.debug('    - inspecting (%r, %r)', startid, chain_so_far)
         if startid in chain_so_far:
-            log.info('    - found cycle %r', chain_so_far)
-            yield chain_so_far
+            # log.info('    - found cycle %r', chain_so_far)
+            if len(chain_so_far) > 1:
+                yield chain_so_far
             return
 
         for nextid in user_map[startid]:
+            if nextid is startid:  # an idblock depending on itself is fine
+                continue
             yield from chain(nextid, chain_so_far + (startid,))
 
     for idblock in user_map.keys():
