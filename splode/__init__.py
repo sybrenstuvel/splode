@@ -43,12 +43,12 @@ def draw_info_header(self, context):
 
 def register():
     bpy.utils.register_class(FILE_OT_splode)
-    bpy.types.INFO_HT_header.append(draw_info_header)
+    bpy.types.VIEW3D_HT_header.append(draw_info_header)
 
 
 def unregister():
     bpy.utils.unregister_class(FILE_OT_splode)
-    bpy.types.INFO_HT_header.remove(draw_info_header)
+    bpy.types.VIEW3D_HT_header.remove(draw_info_header)
 
 
 if __name__ == "__main__":
