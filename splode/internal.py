@@ -138,6 +138,9 @@ def libify(idblock: bpy.types.ID, root_path: pathlib.Path, *, write_idblock=True
                      local_idblock, replacement, replacement.library.filepath)
             local_idblock.user_remap(replacement)
 
+            # After remapping, rename the local ID block so that we can tell the difference
+            local_idblock.name = '(PRE-SPLODE LOCAL) %s' % local_idblock.name
+
 
 def blendfile_for_idblock(idblock: bpy.types.ID, root_path: pathlib.Path) -> pathlib.Path:
     """Returns the filename for the single-thingy blendfile containing this idblock."""
