@@ -9,6 +9,13 @@ bl_info = {
     "category": "System",
 }
 
+if 'bpy' in locals():
+    import importlib
+    import splode.internal, splode.depcycles
+
+    importlib.reload(splode.internal)
+    importlib.reload(splode.depcycles)
+
 import bpy
 
 
