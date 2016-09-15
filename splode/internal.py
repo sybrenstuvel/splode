@@ -18,7 +18,7 @@ ID_TYPES = {'ACTION', 'ARMATURE', 'BRUSH', 'CAMERA', 'CACHEFILE', 'CURVE', 'FONT
 # We don't libify all ID types, just the ones in SPLODE_ID_TYPES.
 # The scene shouldn't be libified, otherwise every blendfile that uses scene Scene will link
 # to the same scene object.
-SPLODE_ID_TYPES = frozenset(ID_TYPES - {'BRUSH', 'CACHEFILE', 'LIBRARY', 'SCENE', 'SCREEN',
+SPLODE_ID_TYPES = frozenset(ID_TYPES - {'BRUSH', 'CACHEFILE', 'KEY', 'LIBRARY', 'SCENE', 'SCREEN',
                                         'WINDOWMANAGER'})
 
 # Ordering of ID types for cyclic dependency handling. When a set of ID blocks have cyclic
