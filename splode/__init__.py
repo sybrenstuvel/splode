@@ -52,7 +52,7 @@ class SPLODE_OT_find_cycles(bpy.types.Operator):
         cycles = depcycles.unify_cycles(cycle_gen)
 
         if cycles:
-            log.info('Found %i disjoint cycles:', len(cycles))
+            log.info('Found %i cycles:', len(cycles))
             for cycle in itertools.islice(cycles, 10):
                 log.info('   - %s', cycle)
             depcycles.assert_disjoint(cycles)
